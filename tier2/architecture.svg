@@ -1,0 +1,155 @@
+<svg viewBox="0 0 1080 560" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#5b8def"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#4caf7d"/>
+    </marker>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#e0a940"/>
+    </marker>
+    <marker id="arrowGrey" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#8a8f98"/>
+    </marker>
+    <linearGradient id="boxGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e2530"/>
+      <stop offset="100%" stop-color="#161b24"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1f2b24"/>
+      <stop offset="100%" stop-color="#161f1a"/>
+    </linearGradient>
+    <linearGradient id="kafkaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2b2416"/>
+      <stop offset="100%" stop-color="#1f1a10"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1080" height="560" fill="#0d1117"/>
+
+  <text x="540" y="34" text-anchor="middle" fill="#e6edf3" font-size="20" font-weight="600">
+    Tier 2 — Async Payment Processing with Kafka
+  </text>
+  <text x="540" y="56" text-anchor="middle" fill="#7d8590" font-size="13">
+    Accept fast (ms) · Process slow (external auth, 2s) · Decoupled by a queue
+  </text>
+
+  <!-- Client -->
+  <g>
+    <rect x="30" y="150" width="140" height="90" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="100" y="188" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Client</text>
+    <text x="100" y="207" text-anchor="middle" fill="#7d8590" font-size="11">k6 / curl</text>
+  </g>
+
+  <!-- Spring Boot -->
+  <g>
+    <rect x="330" y="110" width="220" height="170" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="440" y="140" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Spring Boot :8080</text>
+
+    <rect x="348" y="152" width="184" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="440" y="168" text-anchor="middle" fill="#9cc4ff" font-size="10.5" font-family="monospace">POST /payments</text>
+
+    <rect x="348" y="182" width="184" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="440" y="198" text-anchor="middle" fill="#f2c879" font-size="10.5" font-family="monospace">GET /payments/{id}</text>
+
+    <text x="440" y="222" text-anchor="middle" fill="#7d8590" font-size="9.5">PaymentController → PaymentService</text>
+    <text x="440" y="238" text-anchor="middle" fill="#7d8590" font-size="9.5">save(PENDING) + kafkaTemplate.send()</text>
+    <text x="440" y="258" text-anchor="middle" fill="#7d8590" font-size="9.5">HikariCP pool = 50</text>
+  </g>
+
+  <!-- Kafka -->
+  <g>
+    <rect x="640" y="70" width="200" height="130" rx="10" fill="url(#kafkaGrad)" stroke="#4a3e1f"/>
+    <text x="740" y="100" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Kafka</text>
+    <text x="740" y="117" text-anchor="middle" fill="#7d8590" font-size="10.5">:9092</text>
+
+    <rect x="656" y="130" width="168" height="26" rx="5" fill="#151109" stroke="#4a3e1f"/>
+    <text x="740" y="147" text-anchor="middle" fill="#f2c879" font-size="10.5" font-family="monospace">payment.requested</text>
+
+    <text x="740" y="178" text-anchor="middle" fill="#7d8590" font-size="9">group: payment-processor</text>
+  </g>
+
+  <!-- Consumer -->
+  <g>
+    <rect x="640" y="230" width="200" height="130" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="740" y="260" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">PaymentConsumer</text>
+    <text x="740" y="278" text-anchor="middle" fill="#7d8590" font-size="10">@KafkaListener</text>
+
+    <rect x="656" y="292" width="168" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="740" y="308" text-anchor="middle" fill="#e5534b" font-size="10.5" font-family="monospace">sleep(2000ms)</text>
+
+    <text x="740" y="335" text-anchor="middle" fill="#7d8590" font-size="9.5">ledger write ×2 + status → SUCCEEDED</text>
+  </g>
+
+  <!-- Postgres -->
+  <g>
+    <rect x="330" y="330" width="220" height="130" rx="10" fill="url(#dbGrad)" stroke="#2f4a37"/>
+    <text x="440" y="360" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">PostgreSQL</text>
+    <text x="440" y="377" text-anchor="middle" fill="#7d8590" font-size="10.5">payments db</text>
+
+    <rect x="348" y="392" width="184" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="440" y="408" text-anchor="middle" fill="#e6edf3" font-size="10.5">payments — PENDING → SUCCEEDED</text>
+
+    <rect x="348" y="422" width="184" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="440" y="438" text-anchor="middle" fill="#e6edf3" font-size="10.5">ledger_entries — written by consumer</text>
+  </g>
+
+  <!-- Arrows -->
+  <!-- Client -> Spring (request) -->
+  <path d="M170,180 L328,180" fill="none" stroke="#5b8def" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <circle r="4" fill="#8fb8ff"><animateMotion dur="1.2s" repeatCount="indefinite" path="M170,180 L326,180"/></circle>
+  <text x="248" y="168" text-anchor="middle" fill="#5b8def" font-size="10">POST</text>
+
+  <!-- Spring -> Client (immediate 202/PENDING) -->
+  <path d="M330,220 L172,220" fill="none" stroke="#8a8f98" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrowGrey)"/>
+  <circle r="3.5" fill="#c7cdd6"><animateMotion dur="0.8s" repeatCount="indefinite" path="M330,220 L174,220"/></circle>
+  <text x="248" y="236" text-anchor="middle" fill="#8a8f98" font-size="10">PENDING (ms)</text>
+
+  <!-- Spring -> Postgres (write PENDING) -->
+  <path d="M420,280 L420,328" fill="none" stroke="#4caf7d" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <circle r="4" fill="#7fe0ab"><animateMotion dur="1s" repeatCount="indefinite" path="M420,280 L420,326"/></circle>
+
+  <!-- Spring -> Kafka (publish event) -->
+  <path d="M552,155 L638,130" fill="none" stroke="#e0a940" stroke-width="2" marker-end="url(#arrowAmber)"/>
+  <circle r="4" fill="#f2c879"><animateMotion dur="1s" repeatCount="indefinite" path="M552,155 L636,131"/></circle>
+  <text x="595" y="130" text-anchor="middle" fill="#e0a940" font-size="9.5">send(event)</text>
+
+  <!-- Kafka -> Consumer -->
+  <path d="M740,200 L740,228" fill="none" stroke="#e0a940" stroke-width="2" marker-end="url(#arrowAmber)"/>
+  <circle r="4" fill="#f2c879"><animateMotion dur="1.6s" repeatCount="indefinite" path="M740,200 L740,226"/></circle>
+
+  <!-- Consumer -> Postgres (write ledger + SUCCEEDED, slow) -->
+  <path d="M638,320 L552,410" fill="none" stroke="#4caf7d" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <circle r="4" fill="#7fe0ab"><animateMotion dur="2.4s" repeatCount="indefinite" path="M638,320 L554,408"/></circle>
+
+  <!-- Client -> Spring (GET, later) -->
+  <path d="M170,140 Q 260,90 328,140" fill="none" stroke="#f2c879" stroke-width="1.6" stroke-dasharray="4,4" marker-end="url(#arrowAmber)"/>
+  <text x="248" y="88" text-anchor="middle" fill="#f2c879" font-size="10">GET (later) → SUCCEEDED</text>
+
+  <!-- Lag warning -->
+  <g>
+    <circle cx="740" cy="70" r="8" fill="#3a1d1d" stroke="#e5534b">
+      <animate attributeName="r" values="7;10;7" dur="1.6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.4;1" dur="1.6s" repeatCount="indefinite"/>
+    </circle>
+    <text x="740" y="74" text-anchor="middle" fill="#e5534b" font-size="10" font-weight="700">!</text>
+  </g>
+
+  <!-- Stats strip -->
+  <rect x="30" y="480" width="1020" height="60" rx="8" fill="#111826" stroke="#242b36"/>
+  <text x="55" y="503" fill="#7d8590" font-size="10">accept throughput</text>
+  <text x="55" y="523" fill="#e6edf3" font-size="14" font-weight="700">25 → 3,465 req/s</text>
+
+  <text x="280" y="503" fill="#7d8590" font-size="10">failure rate (vus 500)</text>
+  <text x="280" y="523" fill="#e6edf3" font-size="14" font-weight="700">6.35% → 0%</text>
+
+  <text x="500" y="503" fill="#7d8590" font-size="10">p95 latency</text>
+  <text x="500" y="523" fill="#e6edf3" font-size="14" font-weight="700">38.3s → 540ms</text>
+
+  <text x="700" y="503" fill="#7d8590" font-size="10">consumer throughput</text>
+  <text x="700" y="523" fill="#e5534b" font-size="14" font-weight="700">~0.5 req/s (1 partition)</text>
+
+  <text x="920" y="503" fill="#7d8590" font-size="10">backlog observed</text>
+  <text x="920" y="523" fill="#e5534b" font-size="14" font-weight="700">9,978 PENDING</text>
+</svg>

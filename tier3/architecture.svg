@@ -1,0 +1,203 @@
+<svg viewBox="0 0 1200 760" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#5b8def"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#4caf7d"/></marker>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#e0a940"/></marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#b18cf2"/></marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#e5534b"/></marker>
+    <marker id="arrowGrey" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#8a8f98"/></marker>
+    <linearGradient id="boxGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e2530"/><stop offset="100%" stop-color="#161b24"/></linearGradient>
+    <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1f2b24"/><stop offset="100%" stop-color="#161f1a"/></linearGradient>
+    <linearGradient id="kafkaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2b2416"/><stop offset="100%" stop-color="#1f1a10"/></linearGradient>
+    <linearGradient id="redisGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2b1a1a"/><stop offset="100%" stop-color="#1f1313"/></linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="760" fill="#0d1117"/>
+
+  <text x="600" y="34" text-anchor="middle" fill="#e6edf3" font-size="21" font-weight="600">
+    Full System — Tier 1 + 2 + 3 Combined
+  </text>
+  <text x="600" y="56" text-anchor="middle" fill="#7d8590" font-size="12.5">
+    Synchronous ledger writes · async processing via Kafka · cached read path
+  </text>
+
+  <!-- Client -->
+  <g>
+    <rect x="30" y="330" width="140" height="100" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="100" y="370" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Client</text>
+    <text x="100" y="389" text-anchor="middle" fill="#7d8590" font-size="10.5">k6 / curl</text>
+  </g>
+
+  <!-- Spring Boot outer box -->
+  <rect x="240" y="90" width="340" height="590" rx="12" fill="#10151e" stroke="#242b36" stroke-dasharray="3,3"/>
+  <text x="410" y="112" text-anchor="middle" fill="#7d8590" font-size="11" letter-spacing="1">SPRING BOOT :8080</text>
+
+  <!-- PaymentController/Service -->
+  <g>
+    <rect x="262" y="128" width="296" height="150" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="410" y="152" text-anchor="middle" fill="#e6edf3" font-size="13.5" font-weight="600">Payment</text>
+    <rect x="278" y="164" width="264" height="22" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="410" y="179" text-anchor="middle" fill="#9cc4ff" font-size="10" font-family="monospace">POST /payments</text>
+    <rect x="278" y="192" width="264" height="22" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="410" y="207" text-anchor="middle" fill="#f2c879" font-size="10" font-family="monospace">GET /payments/{id}</text>
+    <text x="410" y="232" text-anchor="middle" fill="#7d8590" font-size="9">PaymentController → PaymentService</text>
+    <text x="410" y="247" text-anchor="middle" fill="#7d8590" font-size="9">idempotency key UNIQUE + REQUIRES_NEW</text>
+    <text x="410" y="262" text-anchor="middle" fill="#7d8590" font-size="9">HikariCP pool = 50</text>
+  </g>
+
+  <!-- Account/Ledger -->
+  <g>
+    <rect x="262" y="296" width="296" height="150" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="410" y="320" text-anchor="middle" fill="#e6edf3" font-size="13.5" font-weight="600">Account / Ledger</text>
+    <rect x="278" y="332" width="264" height="22" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="410" y="347" text-anchor="middle" fill="#9cc4ff" font-size="10" font-family="monospace">GET /accounts/{id}/balance</text>
+    <rect x="278" y="360" width="264" height="20" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="410" y="374" text-anchor="middle" fill="#b18cf2" font-size="9.5" font-family="monospace">@Cacheable("balance")</text>
+    <text x="410" y="400" text-anchor="middle" fill="#7d8590" font-size="9">AccountService → LedgerRepository</text>
+    <text x="410" y="415" text-anchor="middle" fill="#7d8590" font-size="9">SUM(amount) WHERE account_id = ?</text>
+    <text x="410" y="430" text-anchor="middle" fill="#7d8590" font-size="9">@Transactional(readOnly = true)</text>
+  </g>
+
+  <!-- PaymentConsumer -->
+  <g>
+    <rect x="262" y="464" width="296" height="130" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="410" y="488" text-anchor="middle" fill="#e6edf3" font-size="13.5" font-weight="600">PaymentConsumer</text>
+    <text x="410" y="505" text-anchor="middle" fill="#7d8590" font-size="9.5">@KafkaListener(concurrency = "3")</text>
+    <rect x="278" y="516" width="264" height="22" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="410" y="531" text-anchor="middle" fill="#e5534b" font-size="10" font-family="monospace">sleep(2000ms) — bank auth</text>
+    <text x="410" y="555" text-anchor="middle" fill="#7d8590" font-size="9">ledger write ×2 + status → SUCCEEDED</text>
+    <text x="410" y="570" text-anchor="middle" fill="#7d8590" font-size="9">@CacheEvict fromAccount, toAccount</text>
+  </g>
+
+  <!-- KafkaConfig footnote -->
+  <text x="410" y="655" text-anchor="middle" fill="#565d68" font-size="9">config/KafkaConfig.java, config/RedisConfig.java — shared infra beans, not domain logic</text>
+
+  <!-- Kafka -->
+  <g>
+    <rect x="660" y="90" width="220" height="140" rx="10" fill="url(#kafkaGrad)" stroke="#4a3e1f"/>
+    <text x="770" y="120" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Kafka</text>
+    <text x="770" y="138" text-anchor="middle" fill="#7d8590" font-size="10.5">:9092 · 3 partitions</text>
+    <rect x="678" y="150" width="184" height="26" rx="5" fill="#151109" stroke="#4a3e1f"/>
+    <text x="770" y="167" text-anchor="middle" fill="#f2c879" font-size="10" font-family="monospace">payment.requested</text>
+    <text x="770" y="197" text-anchor="middle" fill="#7d8590" font-size="9">group: payment-processor</text>
+  </g>
+
+  <!-- Redis -->
+  <g>
+    <rect x="660" y="270" width="220" height="120" rx="10" fill="url(#redisGrad)" stroke="#4a2a2a"/>
+    <text x="770" y="300" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Redis</text>
+    <text x="770" y="318" text-anchor="middle" fill="#7d8590" font-size="10.5">:6379</text>
+    <rect x="678" y="330" width="184" height="26" rx="5" fill="#151010" stroke="#4a2a2a"/>
+    <text x="770" y="347" text-anchor="middle" fill="#f2a8a2" font-size="10" font-family="monospace">balance::{accountId}</text>
+    <text x="770" y="376" text-anchor="middle" fill="#7d8590" font-size="9">evict-on-write, lazy refill</text>
+  </g>
+
+  <!-- Postgres -->
+  <g>
+    <rect x="660" y="440" width="220" height="150" rx="10" fill="url(#dbGrad)" stroke="#2f4a37"/>
+    <text x="770" y="470" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">PostgreSQL</text>
+    <text x="770" y="488" text-anchor="middle" fill="#7d8590" font-size="10.5">payments db</text>
+    <rect x="678" y="500" width="184" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="770" y="516" text-anchor="middle" fill="#e6edf3" font-size="9.5">payments — PENDING → SUCCEEDED</text>
+    <rect x="678" y="530" width="184" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="770" y="546" text-anchor="middle" fill="#e6edf3" font-size="9.5">ledger_entries — append-only</text>
+    <text x="770" y="572" text-anchor="middle" fill="#7d8590" font-size="8.5">indexes: payment_id, account_id</text>
+  </g>
+
+  <!-- ================= ARROWS ================= -->
+
+  <!-- Client -> Payment (POST) -->
+  <path d="M170,355 L260,190" fill="none" stroke="#5b8def" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <circle r="4" fill="#8fb8ff"><animateMotion dur="1.1s" repeatCount="indefinite" path="M170,355 L258,192"/></circle>
+  <text x="185" y="270" text-anchor="middle" fill="#5b8def" font-size="9.5">POST /payments</text>
+
+  <!-- Payment -> Postgres (write PENDING) -->
+  <path d="M560,220 Q 620,330 660,500" fill="none" stroke="#4caf7d" stroke-width="1.8" marker-end="url(#arrowGreen)"/>
+  <circle r="3.5" fill="#7fe0ab"><animateMotion dur="1.3s" repeatCount="indefinite" path="M560,220 Q 620,330 658,498"/></circle>
+
+  <!-- Payment -> Kafka (publish) -->
+  <path d="M560,180 L658,155" fill="none" stroke="#e0a940" stroke-width="2" marker-end="url(#arrowAmber)"/>
+  <circle r="4" fill="#f2c879"><animateMotion dur="1s" repeatCount="indefinite" path="M560,180 L656,156"/></circle>
+  <text x="610" y="150" text-anchor="middle" fill="#e0a940" font-size="9">publish</text>
+
+  <!-- Kafka -> Consumer -->
+  <path d="M690,230 Q 550,400 560,540" fill="none" stroke="#e0a940" stroke-width="2" marker-end="url(#arrowAmber)"/>
+  <circle r="4" fill="#f2c879"><animateMotion dur="1.8s" repeatCount="indefinite" path="M690,230 Q 550,400 562,538"/></circle>
+
+  <!-- Consumer -> Postgres (ledger write + status) -->
+  <path d="M560,545 L660,530" fill="none" stroke="#4caf7d" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <circle r="4" fill="#7fe0ab"><animateMotion dur="1.4s" repeatCount="indefinite" path="M560,545 L658,531"/></circle>
+
+  <!-- Consumer -> Redis (evict, dashed red) -->
+  <path d="M560,500 Q 630,420 660,370" fill="none" stroke="#e5534b" stroke-width="1.8" stroke-dasharray="4,4" marker-end="url(#arrowRed)"/>
+  <text x="640" y="440" text-anchor="middle" fill="#e5534b" font-size="9">evict on write</text>
+
+  <!-- Client -> Account (GET balance) -->
+  <path d="M170,405 L260,360" fill="none" stroke="#5b8def" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <circle r="4" fill="#8fb8ff"><animateMotion dur="1s" repeatCount="indefinite" path="M170,405 L258,362"/></circle>
+  <text x="185" y="435" text-anchor="middle" fill="#5b8def" font-size="9.5">GET balance</text>
+
+  <!-- Account -> Redis (check) -->
+  <path d="M560,350 L658,330" fill="none" stroke="#b18cf2" stroke-width="2" marker-end="url(#arrowPurple)"/>
+  <circle r="4" fill="#d3b8f7"><animateMotion dur="0.8s" repeatCount="indefinite" path="M560,350 L656,331"/></circle>
+
+  <!-- Redis -> Account (HIT, fast) -->
+  <path d="M658,345 Q 610,390 560,375" fill="none" stroke="#4caf7d" stroke-width="2.2" marker-end="url(#arrowGreen)"/>
+  <text x="620" y="400" text-anchor="middle" fill="#4caf7d" font-size="9" font-weight="600">HIT (ms)</text>
+
+  <!-- Redis -> Postgres (MISS, dashed) -->
+  <path d="M770,392 L770,438" fill="none" stroke="#8a8f98" stroke-width="1.4" stroke-dasharray="4,4" marker-end="url(#arrowGrey)"/>
+  <text x="825" y="418" text-anchor="middle" fill="#8a8f98" font-size="8.5">MISS →</text>
+  <text x="825" y="430" text-anchor="middle" fill="#8a8f98" font-size="8.5">compute</text>
+
+  <!-- Client <- responses (dashed grey, generic) -->
+  <path d="M262,250 Q 200,290 172,345" fill="none" stroke="#8a8f98" stroke-width="1.4" stroke-dasharray="4,4" marker-end="url(#arrowGrey)"/>
+  <text x="200" y="320" text-anchor="middle" fill="#8a8f98" font-size="8.5">response</text>
+
+  <!-- Legend strip -->
+  <rect x="900" y="90" width="270" height="590" rx="10" fill="#111826" stroke="#242b36"/>
+  <text x="920" y="118" fill="#e6edf3" font-size="12.5" font-weight="600">Path legend</text>
+
+  <circle cx="928" cy="140" r="4" fill="#5b8def"/>
+  <text x="942" y="144" fill="#c9d1d9" font-size="10">Client request</text>
+
+  <circle cx="928" cy="164" r="4" fill="#4caf7d"/>
+  <text x="942" y="168" fill="#c9d1d9" font-size="10">DB write / cache hit</text>
+
+  <circle cx="928" cy="188" r="4" fill="#e0a940"/>
+  <text x="942" y="192" fill="#c9d1d9" font-size="10">Kafka publish / consume</text>
+
+  <circle cx="928" cy="212" r="4" fill="#b18cf2"/>
+  <text x="942" y="216" fill="#c9d1d9" font-size="10">Cache lookup</text>
+
+  <circle cx="928" cy="236" r="4" fill="#e5534b"/>
+  <text x="942" y="240" fill="#c9d1d9" font-size="10">Cache evict (write-side)</text>
+
+  <circle cx="928" cy="260" r="4" fill="#8a8f98"/>
+  <text x="942" y="264" fill="#c9d1d9" font-size="10">Response / cache miss</text>
+
+  <line x1="920" y1="284" x2="1152" y2="284" stroke="#242b36"/>
+
+  <text x="920" y="308" fill="#e6edf3" font-size="12.5" font-weight="600">Measured, by tier</text>
+
+  <text x="920" y="332" fill="#7d8590" font-size="9.5">Tier 1 · pool tuning</text>
+  <text x="920" y="348" fill="#e6edf3" font-size="12" font-weight="700">3.6K → 8.5K req/s</text>
+
+  <text x="920" y="374" fill="#7d8590" font-size="9.5">Tier 2 · sync → async accept</text>
+  <text x="920" y="390" fill="#e6edf3" font-size="12" font-weight="700">25 → 3,465 req/s, 6.35% → 0% fail</text>
+
+  <text x="920" y="416" fill="#7d8590" font-size="9.5">Tier 2 · consumer concurrency</text>
+  <text x="920" y="432" fill="#e6edf3" font-size="12" font-weight="700">0.5 → ~1.7 req/s (×3 partitions)</text>
+
+  <text x="920" y="458" fill="#7d8590" font-size="9.5">Tier 3 · balance cache</text>
+  <text x="920" y="474" fill="#e6edf3" font-size="12" font-weight="700">347 → 15,536 req/s (~45x)</text>
+
+  <line x1="920" y1="498" x2="1152" y2="498" stroke="#242b36"/>
+
+  <text x="920" y="522" fill="#e6edf3" font-size="12.5" font-weight="600">Not yet built</text>
+  <text x="920" y="544" fill="#7d8590" font-size="10">Read replicas</text>
+  <text x="920" y="562" fill="#7d8590" font-size="10">Replication lag handling</text>
+  <text x="920" y="580" fill="#7d8590" font-size="10">Circuit breaker (bank call)</text>
+  <text x="920" y="598" fill="#7d8590" font-size="10">Ledger partitioning (Tier 4)</text>
+
+</svg>

@@ -1,0 +1,120 @@
+<svg viewBox="0 0 1000 460" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#5b8def"/>
+    </marker>
+    <marker id="arrowReturn" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#8a8f98"/>
+    </marker>
+    <linearGradient id="boxGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e2530"/>
+      <stop offset="100%" stop-color="#161b24"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1f2b24"/>
+      <stop offset="100%" stop-color="#161f1a"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="460" fill="#0d1117"/>
+
+  <text x="500" y="34" text-anchor="middle" fill="#e6edf3" font-size="20" font-weight="600">
+    Tier 1 — Monolithic Payment Service
+  </text>
+  <text x="500" y="56" text-anchor="middle" fill="#7d8590" font-size="13">
+    Single Spring Boot instance · Single PostgreSQL · Synchronous request handling
+  </text>
+
+  <!-- Client box -->
+  <g>
+    <rect x="40" y="180" width="150" height="90" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="115" y="218" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Client</text>
+    <text x="115" y="238" text-anchor="middle" fill="#7d8590" font-size="11">k6 / curl</text>
+  </g>
+
+  <!-- Spring Boot box -->
+  <g>
+    <rect x="400" y="160" width="200" height="130" rx="10" fill="url(#boxGrad)" stroke="#30363d"/>
+    <text x="500" y="192" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">Spring Boot</text>
+    <text x="500" y="210" text-anchor="middle" fill="#7d8590" font-size="11">:8080</text>
+    <rect x="418" y="222" width="164" height="24" rx="5" fill="#111826" stroke="#2a3140"/>
+    <text x="500" y="238" text-anchor="middle" fill="#9cc4ff" font-size="11" font-family="monospace">POST /payments</text>
+    <text x="500" y="268" text-anchor="middle" fill="#7d8590" font-size="10">HikariCP pool = 50</text>
+  </g>
+
+  <!-- Postgres box -->
+  <g>
+    <rect x="780" y="130" width="190" height="190" rx="10" fill="url(#dbGrad)" stroke="#2f4a37"/>
+    <text x="875" y="160" text-anchor="middle" fill="#e6edf3" font-size="15" font-weight="600">PostgreSQL</text>
+    <text x="875" y="177" text-anchor="middle" fill="#7d8590" font-size="11">payments db</text>
+
+    <rect x="798" y="192" width="154" height="40" rx="6" fill="#111826" stroke="#2a3140"/>
+    <text x="875" y="208" text-anchor="middle" fill="#e6edf3" font-size="11" font-weight="600">payments</text>
+    <text x="875" y="222" text-anchor="middle" fill="#7d8590" font-size="9">1 row / payment · UNIQUE(idempotency_key)</text>
+
+    <rect x="798" y="242" width="154" height="40" rx="6" fill="#111826" stroke="#2a3140"/>
+    <text x="875" y="258" text-anchor="middle" fill="#e6edf3" font-size="11" font-weight="600">ledger_entries</text>
+    <text x="875" y="272" text-anchor="middle" fill="#7d8590" font-size="9">2 rows / payment · debit + credit</text>
+
+    <text x="875" y="300" text-anchor="middle" fill="#7d8590" font-size="9">Indexes: payment_id, account_id</text>
+  </g>
+
+  <!-- Request path (client -> spring) -->
+  <path id="reqPath" d="M190,215 L400,215" fill="none" stroke="#5b8def" stroke-width="2" marker-end="url(#arrow)"/>
+  <circle r="4" fill="#8fb8ff">
+    <animateMotion dur="1.4s" repeatCount="indefinite" path="M190,215 L398,215"/>
+  </circle>
+  <text x="295" y="203" text-anchor="middle" fill="#5b8def" font-size="10">request</text>
+
+  <!-- Spring -> Postgres write path -->
+  <path id="writePath" d="M600,205 L780,205" fill="none" stroke="#4caf7d" stroke-width="2" marker-end="url(#arrow)"/>
+  <circle r="4" fill="#7fe0ab">
+    <animateMotion dur="1.1s" repeatCount="indefinite" path="M600,205 L778,205"/>
+  </circle>
+  <text x="690" y="193" text-anchor="middle" fill="#4caf7d" font-size="10">@Transactional write</text>
+
+  <!-- Postgres -> Spring response -->
+  <path d="M780,260 L600,260" fill="none" stroke="#8a8f98" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrowReturn)"/>
+  <circle r="3.5" fill="#c7cdd6">
+    <animateMotion dur="1.4s" repeatCount="indefinite" path="M780,260 L602,260"/>
+  </circle>
+
+  <!-- Spring -> Client response -->
+  <path d="M400,255 L190,255" fill="none" stroke="#8a8f98" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrowReturn)"/>
+  <circle r="3.5" fill="#c7cdd6">
+    <animateMotion dur="1.6s" repeatCount="indefinite" path="M400,255 L192,255"/>
+  </circle>
+  <text x="295" y="272" text-anchor="middle" fill="#8a8f98" font-size="10">200 OK</text>
+
+  <!-- Status marker (no wall found in tested range) -->
+  <g>
+    <circle cx="875" cy="130" r="9" fill="#122b1c" stroke="#4caf7d">
+      <animate attributeName="r" values="8;11;8" dur="1.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.5;1" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <text x="875" y="134" text-anchor="middle" fill="#4caf7d" font-size="11" font-weight="700">✓</text>
+  </g>
+  <text x="875" y="345" text-anchor="middle" fill="#4caf7d" font-size="12" font-weight="600">
+    0 failures up to 1M rows
+  </text>
+  <text x="875" y="361" text-anchor="middle" fill="#7d8590" font-size="9.5">
+    no reliable throughput wall found —
+  </text>
+  <text x="875" y="374" text-anchor="middle" fill="#7d8590" font-size="9.5">
+    local measurement noise dominates
+  </text>
+
+  <!-- Legend / stats strip -->
+  <rect x="40" y="380" width="920" height="56" rx="8" fill="#111826" stroke="#242b36"/>
+  <text x="60" y="402" fill="#7d8590" font-size="10">throughput (pool=50)</text>
+  <text x="60" y="420" fill="#e6edf3" font-size="14" font-weight="700">9,165 req/s</text>
+
+  <text x="260" y="402" fill="#7d8590" font-size="10">p95 latency</text>
+  <text x="260" y="420" fill="#e6edf3" font-size="14" font-weight="700">136 ms</text>
+
+  <text x="440" y="402" fill="#7d8590" font-size="10">HikariCP 10 → 50</text>
+  <text x="440" y="420" fill="#e6edf3" font-size="14" font-weight="700">2.4x throughput</text>
+
+  <text x="660" y="402" fill="#7d8590" font-size="10">idempotency race test</text>
+  <text x="660" y="420" fill="#e6edf3" font-size="14" font-weight="700">50/50 safe, 0 duplicates</text>
+</svg>
