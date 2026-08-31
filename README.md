@@ -6,7 +6,7 @@
 
 ## 전체 아키텍처
 
-![Full System Architecture](./full-architecture-tier1-4.svg)
+![Full System Architecture](./architecture.svg)
 
 ## 단계별 요약
 

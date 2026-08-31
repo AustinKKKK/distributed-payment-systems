@@ -6,7 +6,7 @@ Started from a single-server, fully synchronous baseline and evolved it step by 
 
 ## Full System Architecture
 
-![Full System Architecture](./full-architecture-tier1-4.svg)
+![Full System Architecture](./architecture.svg)
 
 ## Summary by Tier
 
