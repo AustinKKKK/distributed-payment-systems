@@ -50,9 +50,29 @@ public Optional<Payment> getPaymentForProcessing(Long paymentId) {
 
 The distinction that matters is not "who's calling this" — it's whether the caller can tolerate reading a value that hasn't caught up yet. `readOnly = true` is a routing decision with a correctness consequence, not a free performance default; applying it to every read indiscriminately breaks the one read that structurally requires freshness.
 
+## Confirmed directly: without a replication mechanism, the gap isn't "lag" — it's permanent
+
+Before building the replication job below, the no-sync state was tested deliberately, not just inferred: `ReplicationJob` was disabled entirely, a payment was created, and the same payment was polled repeatedly over several minutes.
+
+```bash
+curl -X POST http://localhost:8080/payments \
+  -d '{"idempotencyKey":"no-replication-test", ...}'
+# → {"paymentId":1,"status":"PENDING"}
+
+curl -v http://localhost:8080/payments/1
+# → HTTP/1.1 404          (immediately after)
+
+# ... waited well beyond any plausible "lag" window ...
+
+curl -v http://localhost:8080/payments/1
+# → HTTP/1.1 404          (still, unchanged)
+```
+
+The row never appeared on the replica, because nothing was copying it there — this is the state a naive primary/replica split lands in if the replication mechanism is skipped or assumed to be automatic. It's an easy trap: adding a second database instance for reads *feels* like it should "just work," but a replica with no active sync is simply a second, permanently empty (or stale) database wearing the same schema.
+
 ## Making replication lag real instead of permanent
 
-With no sync mechanism, the replica would never catch up — that's not "lag," that's "absent." A `@Scheduled` job was added to close that gap on a real (if simulated) delay:
+To turn that permanent gap into an actual, bounded lag, a `@Scheduled` job was added:
 
 ```java
 @Scheduled(fixedRate = 5000)
@@ -73,7 +93,7 @@ Runs every 5 seconds; the 15-second lookback window is intentionally wider than 
 
 **A schema-level trap worth naming:** `payment_id` is `GENERATED ALWAYS AS IDENTITY`, which by design refuses any explicitly supplied value — necessary on the primary (nothing should be able to fake an ID), but exactly what the replication job needs to violate, since it has to write primary's actual ID, not let the replica invent its own. Postgres has an explicit escape hatch for this, `OVERRIDING SYSTEM VALUE`, precisely because "copy this exact row including its identity" is a legitimate, distinct use case from "insert a new row."
 
-## Measured: the lag window is real and bounded
+**With the job running, the same test now resolves instead of hanging forever:**
 
 ```
 POST /payments               → {"paymentId":1,"status":"PENDING"}   (primary, immediate)
@@ -82,35 +102,38 @@ GET  /payments/1  (0s later) → 404                                   (replica 
 GET  /payments/1             → {"paymentId":1,"status":"SUCCEEDED"}  (replication job has run)
 ```
 
-The window is bounded by two things stacked: the consumer's own processing time (currently 2s, simulating a bank call) plus up to one replication job cycle (5s). A client polling `GET /payments/{id}` immediately after a `POST` can legitimately see a 404 for a payment that exists and is actively being processed — not an error condition, but an accurate reflection of where the data currently lives.
+The window is bounded by two things stacked: the consumer's own processing time (currently 2s, simulating a bank call) plus up to one replication job cycle (5s). A client polling `GET /payments/{id}` immediately after a `POST` can legitimately see a 404 for a payment that exists and is actively being processed — not an error condition, but an accurate reflection of where the data currently lives, and a fundamentally different situation from the permanent gap above.
 
 ## A prediction that turned out wrong: does splitting primary/replica raise throughput?
 
-The natural hypothesis after building the routing layer: with writes going to primary and reads going to replica, concurrent write and read load shouldn't contend with each other the way they would on a single instance — so both should hold closer to their Tier 1 solo numbers even when run at the same time.
+The natural hypothesis after building the routing layer: with writes going to primary and reads going to replica, concurrent write and read load shouldn't contend with each other the way they would on a single instance.
 
-**Measured (200 VUs each, 30s duration, run concurrently, `Thread.sleep` disabled to isolate DB throughput):**
+**Controlled A/B, same session, same code, only the replica routing toggled on/off (`RoutingAspect` forced to PRIMARY-only for the "no replica" row, `ReplicationJob` disabled for that run to remove its background load too; 200 VUs × 2, 30s, concurrent write + read):**
 
-| | Throughput | p50 | p95 | Failures |
-|---|---|---|---|---|
-| Write (`POST /payments`, primary) | 2,026 req/s | 81ms | 206ms | 0% |
-| Read (`GET /payments/{id}`, replica) | 2,120 req/s | 78ms | 200ms | **0.55%** |
+| | Write throughput | Read throughput | Read failure rate |
+|---|---|---|---|
+| Primary only (replica routing disabled) | 2,930 req/s | 3,070 req/s | 0.59% |
+| Primary + Replica (routing enabled) | 2,528 req/s | 2,656 req/s | 0.83% |
 
-For comparison, Tier 1 measured ~9,165 req/s for writes alone and 8,000–9,000 req/s for simple reads alone. Both numbers here dropped to roughly a fifth of their solo values — the opposite of the hypothesis, and the read path even picked up a nonzero failure rate it didn't have in isolation.
+Splitting reads onto a second instance made both paths **~14% slower**, not faster, and read failures went up slightly rather than down. (A first attempt at this same A/B, run immediately after restarting the stack, showed a far larger regression — reads and writes both dropping to roughly 300 req/s with 98–100% failures; re-running once the containers had fully warmed up produced the more moderate, repeatable numbers above, which are the ones treated as reliable here.)
 
-**Why:** primary and replica are two Postgres containers on the same physical machine, competing for the same CPU and disk — the same constraint that showed up repeatedly from Tier 1 onward (Docker Desktop's virtualization overhead, everything sharing one MacBook Air). Splitting the *logical* routing of reads and writes doesn't grant either path its own *physical* resources when both instances still share one host. The `ReplicationJob` polling every 5 seconds in the background adds further contention on top. This setup would very plausibly behave as hypothesized on separate machines; on one laptop, "primary vs replica" is a correctness and routing exercise, not a throughput lever. Recorded here rather than smoothed over, consistent with how Tier 1's inconsistent volume-scan numbers were handled — a wrong prediction, measured honestly, is more useful than a hypothesis nobody checked.
+**Why:** primary and replica are two Postgres containers on the same physical machine, competing for the same CPU and disk — the same constraint that showed up repeatedly from Tier 1 onward (Docker Desktop's virtualization overhead, everything sharing one MacBook Air). Splitting the *logical* routing of reads and writes doesn't grant either path its own *physical* resources when both instances still share one host; running a second Postgres container is pure overhead on this setup, not a lever. This is very plausibly a laptop-specific result rather than a universal one — on genuinely separate machines, the original hypothesis would likely hold. What this project actually demonstrates is not "replicas don't help," but "replicas only help under the conditions they're designed for, and it's worth confirming those conditions hold before assuming the win." Recorded here rather than smoothed over, consistent with how Tier 1's inconsistent volume-scan numbers were handled — a wrong prediction, measured honestly, is more useful than a hypothesis nobody checked.
 
 ## A prediction that held: cache throughput is independent of ledger size
 
-Tier 3 measured a 45x throughput gain from caching at 100K ledger rows on one account. The open question was whether that held at a meaningfully larger scale, or whether it was specific to that row count.
+Tier 3 measured a ~38x throughput gain from caching at 100K ledger rows on one account (see Tier 3 README for the controlled same-session figure). The open question was whether that held at a meaningfully larger scale.
 
 **Measured, cache warm, Kafka stopped to remove consumer/replication contention (200 VUs, 30s):**
 
-| | Ledger rows (account 1) | Throughput | p50 | p95 | Failures |
-|---|---|---|---|---|---|
-| Tier 3 | 100,000 | 15,536 req/s | 6.93ms | 48.7ms | 0% |
-| Tier 4 | 429,668 | **25,577 req/s** | 6.75ms | **14.27ms** | 0% |
+| | Ledger rows (account 1) | Throughput | p95 | Failures |
+|---|---|---|---|---|
+| Tier 3 baseline | 100,000 | 29,787 req/s | 13.51ms | 0% |
+| Tier 4 re-check | 429,668 | **25,577 req/s** | 14.27ms | 0% |
 
-A 4.3x larger ledger produced no throughput regression — if anything, both p50 and p95 improved (largely attributable to Kafka being stopped for this run, removing background contention rather than the ledger-size difference itself). This confirms the mechanism directly: once a value is cached, every subsequent read is a Redis key lookup, not a `SUM` over ledger rows — the two are fully decoupled after the first cache miss, regardless of how large the underlying table is.
+Throughput held in the same range despite a 4.3x larger table. This confirms the mechanism directly: once a value is cached, every subsequent read is a Redis key lookup, not a `SUM` over ledger rows — the two are fully decoupled after the first cache miss, regardless of how large the underlying table is. This is the clean counterpart to the primary/replica result above: one scaling technique held up exactly as predicted, the other didn't, and both conclusions came from the same kind of controlled, same-session measurement rather than from assumption.
 
 **A data-integrity issue surfaced while building up to this test, worth recording separately from the result above.** Under sustained heavy load (1M payments being published while the consumer, `ReplicationJob`, and two concurrent k6 runs were all active), `ledger_entries` began accumulating duplicate rows per `payment_id` — one row observed with 8 ledger entries instead of 2 — while `payments.status` stopped advancing past a fixed count entirely. The Hibernate query log showed the same payment's `SELECT`/`UPDATE`/`INSERT` sequence repeating with no exception ever logged, which is the signature of a Kafka consumer group rebalance: if a consumer takes too long between polls (plausible here, given how many things were competing for the same machine), the broker can decide it's dead, reassign its partition, and redeliver messages the original consumer was already partway through — producing duplicate ledger writes with no error anywhere in the stack. This wasn't chased to a fix in this session; it's flagged here as a concrete, observed instance of the at-least-once delivery problem the project's guide called out from Tier 2 onward, now seen under real load rather than described in the abstract.
-# tier4
+
+## Conclusion
+
+This tier's headline result isn't a performance win — it's a documented case of a wrong hypothesis, measured honestly and root-caused, sitting next to a correct one measured the same rigorous way. Primary/replica separation added a real correctness capability (read-your-own-writes handling, a working if simulated replication lag) without the throughput benefit it's usually introduced for, because that benefit depends on physical resource separation this single-machine setup doesn't have. The cache from Tier 3, by contrast, delivered exactly what the mechanism predicts, confirmed again at 4x the data volume. Knowing which of two plausible-sounding scaling techniques will actually pay off in a given environment — rather than assuming both will — is the more transferable finding here than either individual number.

@@ -4,7 +4,7 @@ Tier 2 solved the write path: accepting a payment no longer waits on slow proces
 
 ![Tier 3 architecture](./architecture.svg)
 
-**Status: caching for the read path is done and measured. Read replicas, replication lag, and circuit breakers (the rest of the original Tier 3 scope) are not yet started.**
+**Status: caching for the read path is done and measured. Read replicas and replication lag were later moved to Tier 4; circuit breakers remain in Tier 4's unstarted scope.**
 
 ## Why this endpoint, and why it's a different kind of bottleneck
 
@@ -22,13 +22,13 @@ An index on `account_id` makes finding the relevant rows fast, but it cannot mak
 
 ## Measured: the uncached cost
 
-100,000 payments were routed through a single account pair (`account_id=1 ↔ 2`) to build up ledger history, then `GET /accounts/1/balance` was hit with 200 concurrent VUs, 20,000 iterations — every request summing the same 100K rows.
+100,000 payments were routed through a single account pair (`account_id=1 ↔ 2`) to build up ledger history, then `GET /accounts/1/balance` was hit with 200 concurrent VUs, 200,000 iterations, `@Cacheable` removed from the code path entirely — every single request recomputes the `SUM` from scratch (not just the first one, as would happen with a cold cache).
 
 | | Throughput | p50 | p95 | Failures |
 |---|---|---|---|---|
-| Uncached `SUM` over 100K rows | 347 req/s | 569ms | 709ms | 0% |
+| No caching layer, 100K rows | 776 req/s | 256ms | 336ms | 0% |
 
-For comparison, a simple indexed point lookup (`Payment` status by ID, Tier 1/2) runs at 8,000–9,000 req/s with p95 under 150ms. This is a ~20–25x throughput drop purely from replacing "find one row" with "sum many rows" — no concurrency issue involved, nothing failed, it's just doing 100,000 additions on every single request.
+For comparison, a simple indexed point lookup (`Payment` status by ID, Tier 1/2) runs at 8,000–9,000 req/s with p95 under 150ms. This is a ~10x throughput drop purely from replacing "find one row" with "sum many rows" on every request — no concurrency issue involved, nothing failed, it's just doing 100,000 additions every single time.
 
 ## Fix: cache the result, evict on write
 
@@ -57,9 +57,24 @@ public Payment processLedgerAndFinish(Payment payment, Long fromAccount, Long to
 
 ## Results
 
+**Controlled A/B — same session, same 100K-row ledger, same load profile (200 VUs, 200,000 iterations), only `@Cacheable` toggled:**
+
 | | Throughput | p50 | p95 | Improvement |
 |---|---|---|---|---|
-| No cache | 347 req/s | 569ms | 709ms | — |
-| Cached (`@Cacheable`) | **15,536 req/s** | **6.93ms** | **48.7ms** | **~45x throughput, ~82x p50** |
+| No cache | 776 req/s | 256ms | 336ms | — |
+| Cached (`@Cacheable`) | **29,787 req/s** | **4.91ms** | **13.51ms** | **~38.4x throughput, ~52x p50** |
 
-With 200 concurrent readers hammering the same account, only the first request pays the full `SUM` cost; the remaining 19,999 read a value already sitting in Redis. Postgres barely sees this traffic anymore — the read load that used to hit the database is now almost entirely absorbed by the cache.
+With 200 concurrent readers hammering the same account, only the first request pays the full `SUM` cost; the remaining 199,999 read a value already sitting in Redis. Postgres barely sees this traffic anymore — the read load that used to hit the database is now almost entirely absorbed by the cache.
+
+*An earlier, smaller-scale measurement (100K iterations instead of 200K, and against a differently sized ledger at the time) found 347 → 15,536 req/s (~45x). The 38.4x figure above comes from a controlled same-session comparison — identical ledger, identical load, single code toggle — and is the one treated as authoritative.*
+
+## Confirmed separately: cache throughput is independent of ledger size
+
+The same cached endpoint was re-measured later (in Tier 4) against a 429,668-row ledger — 4.3x larger — under the same 200 VU / 30s profile, with background Kafka activity stopped to remove unrelated contention:
+
+| | Ledger rows | Throughput | p95 |
+|---|---|---|---|
+| Tier 3 (this measurement) | 100,000 | 29,787 req/s | 13.51ms |
+| Tier 4 re-check | 429,668 | 25,577 req/s | 14.27ms |
+
+Throughput held in the same range despite a 4.3x larger table — consistent with the mechanism: once a value is cached, every subsequent read is a Redis key lookup, not a `SUM` over ledger rows, so the two are fully decoupled after the first cache miss regardless of table size.

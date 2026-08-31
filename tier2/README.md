@@ -10,13 +10,13 @@ Every payment in Tier 1 does DB writes only, so it returns in tens of millisecon
 
 **The math:** HikariCP pool = 50, each request holds a connection for 2s → theoretical ceiling = 50 ÷ 2 = **25 req/s**. Anything beyond that queues, and past HikariCP's 30s connection-acquisition timeout, requests start failing outright.
 
-**Measured (vus 500, sustained load):**
+**Measured (vus 500, 30s sustained load):**
 
-| | Throughput | p95 | Failure rate |
+| | Throughput | Failure rate | vus behavior |
 |---|---|---|---|
-| Synchronous (Tier 1 + 2s delay) | 25.7 req/s | 38.3s | **6.35%** |
+| Synchronous (Tier 1 + 2s delay) | 24.5 req/s | **3.75%** | k6 couldn't even ramp to 500 concurrent — the server was too slow to accept new virtual users, so measured concurrency climbed from 5 to 500 over the run rather than starting there |
 
-Raising the connection pool doesn't fix this — the bottleneck isn't connection count, it's connections being held for the duration of a slow external call. The fix is structural, not a bigger pool.
+Note the last column: this is itself a symptom, not a measurement artifact. When a server can't respond fast enough, even the load generator struggles to reach its target concurrency — a sign of just how saturated the synchronous path was. Raising the connection pool doesn't fix this — the bottleneck isn't connection count, it's connections being held for the duration of a slow external call. The fix is structural, not a bigger pool.
 
 ## What changed
 
@@ -44,14 +44,14 @@ GET /payments/{id}   // client polls for the result later
 
 ## Results
 
-**Accept-path throughput (`POST /payments` only, vus 500):**
+**Accept-path throughput (`POST /payments` only, vus 500, 30s), same session, controlled comparison:**
 
-| | Throughput      | p95 | Failure rate |
-|---|-----------------|---|---|
-| Synchronous (Tier 1 + 2s delay) | 25.7 req/s      | 38.3s | 6.35% |
-| Async accept (Tier 2, Kafka) | **3,465 req/s** | **540ms** | **0%** |
+| | Throughput | Failure rate |
+|---|---|---|
+| Synchronous (Tier 1 + 2s delay) | 24.5 req/s | 3.75% |
+| Async accept (Tier 2, Kafka) | **4,082 req/s** | **0%** |
 
-**134 x throughput, failures eliminated.** The request path no longer touches the slow dependency at all — it writes one row and publishes one message, both fast, local operations.
+**~167x throughput, failures eliminated.** The request path no longer touches the slow dependency at all — it writes one row and publishes one message, both fast, local operations. (An earlier, separate measurement session found 3,465–6,300 req/s and 134x under slightly different background load; the 167x figure above is from a controlled same-session A/B and is the one treated as authoritative here.)
 
 **The new bottleneck this creates:**
 
@@ -87,7 +87,4 @@ A representative set of failures hit while wiring this up, since each one maps t
 
 ## Conclusion
 
-Kafka doesn't make slow work fast — it makes the API stop waiting for it. Accept-side throughput went from a synchronous 25 req/s (or 6.35% failures under load) to an async 3,465–6,300 req/s with zero failures, by moving the 2-second cost off the request path entirely. But it doesn't automatically make total processing capacity keep up with acceptance capacity: a single-partition consumer created a new bottleneck (~0.5 req/s), invisible as errors but real as a multi-hour backlog. Scaling to 3 partitions with matching consumer concurrency recovered roughly 3x consumer throughput, confirming that horizontal scaling on the consumer side works — up to the point where the constraint stops being about how many consumers you run and starts being about how many concurrent requests the external dependency itself can absorb. Kafka scales the queue and the fan-out; it doesn't scale the bank.
-
----
-# tier2
+Kafka doesn't make slow work fast — it makes the API stop waiting for it. Accept-side throughput went from a synchronous ~25 req/s (3.75–6.35% failures under load, depending on session) to an async 4,082 req/s with zero failures, by moving the 2-second cost off the request path entirely. But it doesn't automatically make total processing capacity keep up with acceptance capacity: a single-partition consumer created a new bottleneck (~0.5 req/s), invisible as errors but real as a multi-hour backlog. Scaling to 3 partitions with matching consumer concurrency recovered roughly 3x consumer throughput, confirming that horizontal scaling on the consumer side works — up to the point where the constraint stops being about how many consumers you run and starts being about how many concurrent requests the external dependency itself can absorb. Kafka scales the queue and the fan-out; it doesn't scale the bank.
