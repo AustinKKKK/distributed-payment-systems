@@ -190,7 +190,7 @@
   <text x="920" y="432" fill="#e6edf3" font-size="12" font-weight="700">0.5 → ~1.7 req/s (×3 partitions)</text>
 
   <text x="920" y="458" fill="#7d8590" font-size="9.5">Tier 3 · balance cache</text>
-  <text x="920" y="474" fill="#e6edf3" font-size="12" font-weight="700">347 → 15,536 req/s (~45x)</text>
+  <text x="920" y="474" fill="#e6edf3" font-size="12" font-weight="700">776 → 29,787 req/s (~38.7x)</text>
 
   <line x1="920" y1="498" x2="1152" y2="498" stroke="#242b36"/>
 
