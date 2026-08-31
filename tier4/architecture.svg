@@ -226,7 +226,7 @@
   <text x="944" y="436" fill="#e6edf3" font-size="11.5" font-weight="700">0.5 → ~1.7 req/s (×3 partitions)</text>
 
   <text x="944" y="460" fill="#7d8590" font-size="9.5">Tier 3 · balance cache</text>
-  <text x="944" y="476" fill="#e6edf3" font-size="11.5" font-weight="700">347 → 15,536 req/s (~45x)</text>
+  <text x="944" y="476" fill="#e6edf3" font-size="11.5" font-weight="700">776 → 29,787 req/s (~38.7x)</text>
 
   <text x="944" y="500" fill="#7d8590" font-size="9.5">Tier 4 · replication lag window</text>
   <text x="944" y="516" fill="#e6edf3" font-size="11.5" font-weight="700">~5–15s stale reads on replica</text>
